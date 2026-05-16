@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>대박마트 고기 재고현황</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 1rem;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .header h1 { font-size: 24px; font-weight: 700; color: #1a1a1a; margin-bottom: 0.25rem; }
+    .header p { font-size: 13px; color: #888; }
+    .sync-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 0.75rem;
+      font-size: 13px;
+      font-weight: 500;
+      color: #3B6D11;
+    }
+    .sync-bar.offline { color: #A32D2D; }
+    .sync-bar.syncing { color: #BA7517; }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #3B6D11;
+      animation: pulse 2s infinite;
+    }
+    .sync-bar.offline .dot { background: #A32D2D; animation: none; }
+    .sync-bar.syncing .dot { background: #BA7517; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .main-tabs {
+      display: flex;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .main-tab {
+      flex: 1;
+      padding: 0.85rem;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: #888;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    .main-tab.active { color: #185FA5; border-bottom-color: #185FA5; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    .card-header {
+      padding: 1rem;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .card-header h3 { font-size: 15px; font-weight: 600; color: #1a1a1a; }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 1rem;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .search-input {
+      flex: 1;
+      min-width: 160px;
+      padding: 0.65rem 0.85rem;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+    .search-input:focus { border-color: #185FA5; }
+
+    .btn {
+      padding: 0.65rem 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-blue { background: #185FA5; color: white; }
+    .btn-blue:hover { background: #0C447C; }
+    .btn-green { background: #3B6D11; color: white; }
+    .btn-green:hover { background: #27500A; }
+    .btn-gray { background: #f0f0f0; color: #444; }
+    .btn-gray:hover { background: #e0e0e0; }
+    .btn-red { background: #FCEBEB; color: #A32D2D; }
+    .btn-red:hover { background: #f5d5d5; }
+
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th {
+      background: #fafafa;
+      padding: 0.85rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: #444;
+      border-bottom: 1px solid #f0f0f0;
+      white-space: nowrap;
+    }
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid #f8f8f8;
+      color: #1a1a1a;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    .tag-low { color: #A32D2D; font-weight: 700; }
+    .tag-ok { color: #3B6D11; font-weight: 700; }
+
+    .action-btns { display: flex; gap: 6px; }
+    .btn-xs {
+      padding: 0.3rem 0.65rem;
+      font-size: 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-xs-edit { background: #E6F1FB; color: #185FA5; }
+    .btn-xs-del { background: #FCEBEB; color: #A32D2D; }
+
+    .empty-row td { text-align: center; color: #aaa; padding: 2rem; }
+
+    /* 패스워드 */
+    .pw-form {
+      max-width: 360px;
+      margin: 2rem auto;
+      padding: 2rem;
+      background: white;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .pw-form h2 { font-size: 18px; margin-bottom: 1.25rem; }
+    .pw-input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      letter-spacing: 2px;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    /* 서브탭 */
+    .sub-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 0.75rem 1rem 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .sub-tab {
+      padding: 0.5rem 1rem;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: #888;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .sub-tab.active { color: #185FA5; border-bottom-color: #185FA5; }
+
+    /* 모달 */
+    .modal {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal.active { display: flex; }
+    .modal-box {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 440px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-box h2 { font-size: 18px; margin-bottom: 1.25rem; font-weight: 600; }
+    .fg { margin-bottom: 1rem; }
+    .fg label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 0.4rem; }
+    .fg input, .fg textarea, .fg select {
+      width: 100%;
+      padding: 0.7rem 0.85rem;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+    }
+    .fg input:focus, .fg textarea:focus { border-color: #185FA5; }
+    .fg textarea { resize: vertical; min-height: 70px; }
+    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; }
+
+    /* 설정 */
+    .settings-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .settings-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 1rem; }
+    .info-box {
+      background: #E6F1FB;
+      color: #185FA5;
+      padding: 1rem;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.7;
+      margin-top: 1rem;
+    }
+    .result-box {
+      margin-top: 0.75rem;
+      padding: 0.85rem;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      display: none;
+    }
+    .result-box.show { display: block; }
+    .result-box.success { background: #EAF3DE; color: #3B6D11; }
+    .result-box.error { background: #FCEBEB; color: #A32D2D; }
+    .result-box.loading { background: #FFF4E6; color: #BA7517; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>🥩 대박마트 고기 재고현황</h1>
+    <p>실시간 재고 및 입고 관리 시스템</p>
+    <div class="sync-bar offline" id="syncBar">
+      <span class="dot"></span>
+      <span id="syncText">구글시트 미연동</span>
+    </div>
+  </div>
+
+  <div class="main-tabs">
+    <button class="main-tab active" onclick="gotoTab('inventory',this)">📊 재고현황</button>
+    <button class="main-tab" onclick="gotoTab('admin',this)">📈 입고 통계</button>
+    <button class="main-tab" onclick="gotoTab('settings',this)">⚙️ 설정</button>
+  </div>
+
+  <!-- ========== 재고현황 ========== -->
+  <div id="inventory" class="tab-content active">
+    <div class="card">
+      <div class="controls">
+        <input class="search-input" id="invSearch" placeholder="🔍 제품명 검색..." onkeyup="renderInv()">
+        <button class="btn btn-blue" onclick="openModal('addProd')">+ 제품 추가</button>
+        <button class="btn btn-green" onclick="openModal('addOrd')">📥 입고 등록</button>
+        <button class="btn btn-green" onclick="syncNow()">🔄 동기화</button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>제품명</th><th>현재재고</th><th>필요수량</th>
+              <th>가격</th><th>유통기한</th><th>기타사항</th><th>조작</th>
+            </tr>
+          </thead>
+          <tbody id="invTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 입고 통계 ========== -->
+  <div id="admin" class="tab-content">
+    <div id="pwForm" class="pw-form">
+      <h2>🔐 관리자 인증</h2>
+      <input class="pw-input" type="password" id="pwInput" placeholder="비밀번호">
+      <button class="btn btn-blue" style="width:100%" onclick="checkPw()">인증</button>
+    </div>
+
+    <div id="adminPanel" style="display:none">
+      <div class="card">
+        <div class="sub-tabs">
+          <button class="sub-tab active" onclick="gotoAdmin('order',this)">입고</button>
+          <button class="sub-tab" onclick="gotoAdmin('daily',this)">일별</button>
+          <button class="sub-tab" onclick="gotoAdmin('weekly',this)">주별</button>
+          <button class="sub-tab" onclick="gotoAdmin('monthly',this)">월별</button>
+        </div>
+
+        <!-- 입고 -->
+        <div id="orderPane" class="tab-content active">
+          <div class="controls">
+            <input class="search-input" id="ordSearch" placeholder="🔍 제품 검색..." onkeyup="renderOrd()">
+            <button class="btn btn-blue" onclick="exportPDF('orderPane','입고현황')">📄 PDF</button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>입고날짜</th><th>제품명</th><th>입고수량</th></tr></thead>
+              <tbody id="ordTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 일별 -->
+        <div id="dailyPane" class="tab-content">
+          <div class="controls">
+            <input class="search-input" id="daySearch" placeholder="🔍 제품 검색..." onkeyup="renderDaily()">
+            <button class="btn btn-blue" onclick="exportPDF('dailyPane','일별통계')">📄 PDF</button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>날짜</th><th>제품명</th><th>입고수량</th></tr></thead>
+              <tbody id="dailyTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 주별 -->
+        <div id="weeklyPane" class="tab-content">
+          <div class="controls">
+            <input class="search-input" id="weekSearch" placeholder="🔍 제품 검색..." onkeyup="renderWeekly()">
+            <button class="btn btn-blue" onclick="exportPDF('weeklyPane','주별통계')">📄 PDF</button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>주차</th><th>제품명</th><th>입고수량</th></tr></thead>
+              <tbody id="weeklyTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 월별 -->
+        <div id="monthlyPane" class="tab-content">
+          <div class="controls">
+            <input class="search-input" id="monSearch" placeholder="🔍 제품 검색..." onkeyup="renderMonthly()">
+            <button class="btn btn-blue" onclick="exportPDF('monthlyPane','월별통계')">📄 PDF</button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>월</th><th>제품명</th><th>입고수량</th></tr></thead>
+              <tbody id="monthlyTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 설정 ========== -->
+  <div id="settings" class="tab-content">
+    <div class="settings-card">
+      <h3>🔗 구글시트 연동</h3>
+      <div class="fg">
+        <label>Google Apps Script 웹 앱 URL</label>
+        <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/d/...">
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-blue" onclick="testConn()">🧪 연결 테스트</button>
+        <button class="btn btn-green" onclick="saveUrl()">💾 저장</button>
+        <button class="btn btn-gray" onclick="pullFromSheet()">📥 시트에서 불러오기</button>
+      </div>
+      <div class="result-box" id="connResult"></div>
+      <div class="info-box">
+        <strong>Apps Script 코드 (새 배포 후 URL 입력)</strong><br><br>
+        1. 구글시트 → 확장 프로그램 → Apps Script<br>
+        2. 코드 전체 교체 후 저장<br>
+        3. 배포 → 새 배포 → 웹 앱 / 자신 / 누구나<br>
+        4. 웹 앱 URL 복사 후 위에 입력
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 제품 추가 모달 -->
+<div class="modal" id="addProd">
+  <div class="modal-box">
+    <h2>제품 추가</h2>
+    <div class="fg"><label>제품명</label><input id="f_name" placeholder="예: 소고기(등심)"></div>
+    <div class="fg"><label>현재재고</label><input id="f_cur" type="number" placeholder="0"></div>
+    <div class="fg"><label>필요수량</label><input id="f_req" type="number" placeholder="0"></div>
+    <div class="fg"><label>가격 (₩)</label><input id="f_price" type="number" placeholder="0"></div>
+    <div class="fg"><label>유통기한</label><input id="f_exp" type="date"></div>
+    <div class="fg"><label>기타사항</label><textarea id="f_notes" placeholder="특이사항"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-gray" onclick="closeModal('addProd')">취소</button>
+      <button class="btn btn-blue" onclick="addProduct()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- 제품 수정 모달 -->
+<div class="modal" id="editProd">
+  <div class="modal-box">
+    <h2>제품 수정</h2>
+    <div class="fg"><label>제품명</label><input id="e_name"></div>
+    <div class="fg"><label>현재재고</label><input id="e_cur" type="number"></div>
+    <div class="fg"><label>필요수량</label><input id="e_req" type="number"></div>
+    <div class="fg"><label>가격 (₩)</label><input id="e_price" type="number"></div>
+    <div class="fg"><label>유통기한</label><input id="e_exp" type="date"></div>
+    <div class="fg"><label>기타사항</label><textarea id="e_notes"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-gray" onclick="closeModal('editProd')">취소</button>
+      <button class="btn btn-blue" onclick="saveEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 입고 등록 모달 -->
+<div class="modal" id="addOrd">
+  <div class="modal-box">
+    <h2>📥 입고 등록</h2>
+    <div class="fg"><label>입고 날짜</label><input id="o_date" type="date"></div>
+    <div class="fg"><label>제품명</label>
+      <select id="o_prod"><option value="">선택하세요</option></select>
+    </div>
+    <div class="fg"><label>입고 수량</label><input id="o_qty" type="number" placeholder="0"></div>
+    <div class="modal-footer">
+      <button class="btn btn-gray" onclick="closeModal('addOrd')">취소</button>
+      <button class="btn btn-green" onclick="addOrder()">등록</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+// ===== 데이터 =====
+let products = JSON.parse(localStorage.getItem('products')) || [
+  {id:1,name:'소고기(등심)',current:15,required:20,price:25000,expire:'2025-05-20',notes:'냉동'},
+  {id:2,name:'돼지고기(삼겹살)',current:8,required:15,price:18000,expire:'2025-05-22',notes:'신선'},
+  {id:3,name:'닭고기(가슴살)',current:25,required:30,price:12000,expire:'2025-05-25',notes:'냉동'},
+];
+let orders = JSON.parse(localStorage.getItem('orders')) || [
+  {id:1,date:'2025-05-10',product:'소고기(등심)',quantity:10},
+  {id:2,date:'2025-05-11',product:'돼지고기(삼겹살)',quantity:5},
+  {id:3,date:'2025-05-12',product:'닭고기(가슴살)',quantity:15},
+];
+let scriptUrl = localStorage.getItem('scriptUrl') || '';
+let editingId = null;
+
+function save() {
+  localStorage.setItem('products', JSON.stringify(products));
+  localStorage.setItem('orders', JSON.stringify(orders));
+}
+
+// ===== 탭 전환 =====
+function gotoTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.main-tab').forEach(e => e.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+function gotoAdmin(name, btn) {
+  document.querySelectorAll('[id$="Pane"]').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.sub-tab').forEach(e => e.classList.remove('active'));
+  document.getElementById(name+'Pane').classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name==='order') renderOrd();
+  else if (name==='daily') renderDaily();
+  else if (name==='weekly') renderWeekly();
+  else if (name==='monthly') renderMonthly();
+}
+
+// ===== 재고현황 렌더 =====
+function renderInv() {
+  const q = document.getElementById('invSearch').value.toLowerCase();
+  const tb = document.getElementById('invTable');
+  const list = products.filter(p => p.name.toLowerCase().includes(q));
+  if (!list.length) {
+    tb.innerHTML = '<tr class="empty-row"><td colspan="7">제품이 없습니다</td></tr>';
+    return;
+  }
+  tb.innerHTML = list.map(p => `
+    <tr>
+      <td><strong>${p.name}</strong></td>
+      <td class="${p.current < p.required ? 'tag-low' : 'tag-ok'}">${p.current}</td>
+      <td>${p.required}</td>
+      <td>₩${p.price.toLocaleString()}</td>
+      <td>${p.expire||'-'}</td>
+      <td>${p.notes||'-'}</td>
+      <td>
+        <div class="action-btns">
+          <button class="btn-xs btn-xs-edit" onclick="openEdit(${p.id})">수정</button>
+          <button class="btn-xs btn-xs-del" onclick="delProduct(${p.id})">삭제</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+// ===== 제품 추가 =====
+function addProduct() {
+  const name = document.getElementById('f_name').value.trim();
+  if (!name) return alert('제품명을 입력하세요');
+  const newId = (Math.max(0, ...products.map(p=>p.id))) + 1;
+  products.push({
+    id: newId,
+    name,
+    current: +document.getElementById('f_cur').value || 0,
+    required: +document.getElementById('f_req').value || 0,
+    price: +document.getElementById('f_price').value || 0,
+    expire: document.getElementById('f_exp').value,
+    notes: document.getElementById('f_notes').value.trim()
+  });
+  save(); renderInv(); updateSelect(); closeModal('addProd');
+  document.getElementById('f_name').value='';
+  document.getElementById('f_cur').value='';
+  document.getElementById('f_req').value='';
+  document.getElementById('f_price').value='';
+  document.getElementById('f_exp').value='';
+  document.getElementById('f_notes').value='';
+}
+
+// ===== 제품 수정 =====
+function openEdit(id) {
+  const p = products.find(x=>x.id===id);
+  if (!p) return;
+  editingId = id;
+  document.getElementById('e_name').value = p.name;
+  document.getElementById('e_cur').value = p.current;
+  document.getElementById('e_req').value = p.required;
+  document.getElementById('e_price').value = p.price;
+  document.getElementById('e_exp').value = p.expire;
+  document.getElementById('e_notes').value = p.notes;
+  openModal('editProd');
+}
+
+function saveEdit() {
+  const p = products.find(x=>x.id===editingId);
+  if (!p) return;
+  p.name = document.getElementById('e_name').value.trim();
+  p.current = +document.getElementById('e_cur').value || 0;
+  p.required = +document.getElementById('e_req').value || 0;
+  p.price = +document.getElementById('e_price').value || 0;
+  p.expire = document.getElementById('e_exp').value;
+  p.notes = document.getElementById('e_notes').value.trim();
+  save(); renderInv(); updateSelect(); closeModal('editProd');
+}
+
+function delProduct(id) {
+  if (!confirm('정말 삭제하시겠습니까?')) return;
+  products = products.filter(p=>p.id!==id);
+  save(); renderInv(); updateSelect();
+}
+
+// ===== 입고 =====
+function updateSelect() {
+  const sel = document.getElementById('o_prod');
+  sel.innerHTML = '<option value="">선택하세요</option>' +
+    products.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+}
+
+function addOrder() {
+  const date = document.getElementById('o_date').value;
+  const product = document.getElementById('o_prod').value;
+  const qty = +document.getElementById('o_qty').value;
+  if (!date || !product || qty<=0) return alert('모든 항목을 입력하세요');
+  const newId = (Math.max(0,...orders.map(o=>o.id)))+1;
+  orders.push({id:newId, date, product, quantity:qty});
+  save(); closeModal('addOrd'); alert('✅ 입고 등록 완료');
+}
+
+// ===== 통계 렌더 =====
+function renderOrd() {
+  const q = document.getElementById('ordSearch').value.toLowerCase();
+  const tb = document.getElementById('ordTable');
+  const list = orders.filter(o=>o.product.toLowerCase().includes(q))
+    .sort((a,b)=>b.date.localeCompare(a.date));
+  if (!list.length) { tb.innerHTML='<tr class="empty-row"><td colspan="3">입고 기록 없음</td></tr>'; return; }
+  tb.innerHTML = list.map(o=>`<tr><td>${o.date}</td><td>${o.product}</td><td>${o.quantity}</td></tr>`).join('');
+}
+
+function groupStats(keyFn) {
+  const stats = {};
+  orders.forEach(o => {
+    const key = keyFn(o.date);
+    if (!stats[key]) stats[key] = {};
+    stats[key][o.product] = (stats[key][o.product]||0) + o.quantity;
+  });
+  return stats;
+}
+
+function renderStats(tbId, stats, searchId) {
+  const q = document.getElementById(searchId).value.toLowerCase();
+  const tb = document.getElementById(tbId);
+  const keys = Object.keys(stats).sort().reverse();
+  if (!keys.length) { tb.innerHTML='<tr class="empty-row"><td colspan="3">데이터 없음</td></tr>'; return; }
+  const rows = [];
+  keys.forEach(key => {
+    Object.keys(stats[key])
+      .filter(prod=>prod.toLowerCase().includes(q))
+      .forEach((prod, i) => {
+        rows.push(`<tr><td>${i===0?key:''}</td><td>${prod}</td><td>${stats[key][prod]}</td></tr>`);
+      });
+  });
+  tb.innerHTML = rows.length ? rows.join('') : '<tr class="empty-row"><td colspan="3">데이터 없음</td></tr>';
+}
+
+function weekNum(dateStr) {
+  const d = new Date(dateStr);
+  const jan1 = new Date(d.getFullYear(),0,1);
+  return `${d.getFullYear()}-W${Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7)}`;
+}
+
+function renderDaily()   { renderStats('dailyTable',  groupStats(d=>d),                    'daySearch'); }
+function renderWeekly()  { renderStats('weeklyTable',  groupStats(d=>weekNum(d)),            'weekSearch'); }
+function renderMonthly() { renderStats('monthlyTable', groupStats(d=>d.slice(0,7)),         'monSearch'); }
+
+// ===== 모달 =====
+function openModal(id) {
+  if (id==='addOrd') {
+    document.getElementById('o_date').value = new Date().toISOString().slice(0,10);
+    document.getElementById('o_qty').value = '';
+    document.getElementById('o_prod').value = '';
+    updateSelect();
+  }
+  document.getElementById(id).classList.add('active');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// ===== 관리자 인증 =====
+function checkPw() {
+  if (document.getElementById('pwInput').value === '860812') {
+    document.getElementById('pwForm').style.display='none';
+    document.getElementById('adminPanel').style.display='block';
+    renderOrd();
+  } else {
+    alert('비밀번호가 틀렸습니다');
+    document.getElementById('pwInput').value='';
+  }
+}
+
+// ===== 구글시트 동기화 =====
+function setSyncStatus(status, msg) {
+  const bar = document.getElementById('syncBar');
+  bar.className = 'sync-bar ' + status;
+  document.getElementById('syncText').textContent = msg;
+}
+
+function syncNow() {
+  if (!scriptUrl) { alert('설정 탭에서 구글시트 URL을 먼저 입력해주세요'); return; }
+  setSyncStatus('syncing', '동기화 중...');
+  fetch(scriptUrl, {
+    method: 'POST',
+    body: JSON.stringify({ action:'syncAll', products, orders }),
+    headers: {'Content-Type':'text/plain'}
+  })
+  .then(r=>r.json())
+  .then(data=>{
+    if (data.success) {
+      setSyncStatus('', '✅ 동기화 완료 · ' + new Date().toLocaleTimeString('ko-KR'));
+    } else {
+      setSyncStatus('offline', '❌ 동기화 실패: ' + (data.message||data.error));
+    }
+  })
+  .catch(err=>setSyncStatus('offline', '❌ 연결 실패'));
+}
+
+function pullFromSheet() {
+  if (!scriptUrl) { alert('설정 탭에서 구글시트 URL을 먼저 입력해주세요'); return; }
+  showResult('loading', '🔄 불러오는 중...');
+  fetch(scriptUrl + '?action=getInventory')
+  .then(r=>r.json())
+  .then(data=>{
+    if (data.success && data.data.length) {
+      products = data.data.map(r=>({
+        id: +r.id, name: r['제품명'], current: +r['현재재고'],
+        required: +r['필요수량'], price: +r['가격'],
+        expire: r['유통기한'], notes: r['기타사항']
+      }));
+      save(); renderInv(); updateSelect();
+      showResult('success', '✅ 구글시트에서 데이터를 가져왔습니다');
+    } else {
+      showResult('error', '❌ 데이터 없음 또는 오류');
+    }
+  })
+  .catch(()=>showResult('error', '❌ 불러오기 실패'));
+}
+
+function testConn() {
+  const url = document.getElementById('scriptUrl').value.trim();
+  if (!url) { showResult('error','URL을 입력하세요'); return; }
+  showResult('loading','🔄 테스트 중...');
+  fetch(url)
+  .then(r=>r.json())
+  .then(d=>{
+    if (d.success) showResult('success','✅ 연결 성공! 구글시트와 정상 연동되었습니다');
+    else showResult('error','❌ 오류: '+(d.error||d.message));
+  })
+  .catch(e=>showResult('error','❌ 연결 실패: '+e.message));
+}
+
+function saveUrl() {
+  const url = document.getElementById('scriptUrl').value.trim();
+  if (!url) { showResult('error','URL을 입력하세요'); return; }
+  localStorage.setItem('scriptUrl', url);
+  scriptUrl = url;
+  setSyncStatus('', '구글시트 연동됨');
+  showResult('success','✅ URL이 저장되었습니다');
+}
+
+function showResult(type, msg) {
+  const el = document.getElementById('connResult');
+  el.className = 'result-box show ' + type;
+  el.textContent = msg;
+}
+
+// ===== PDF 내보내기 =====
+function exportPDF(paneId, title) {
+  const pane = document.getElementById(paneId);
+  const el = document.createElement('div');
+  el.style.padding = '20px';
+  el.style.background = 'white';
+  el.innerHTML = `
+    <h2 style="margin-bottom:8px">🥩 대박마트 - ${title}</h2>
+    <p style="color:#888;margin-bottom:16px;font-size:13px">작성일: ${new Date().toLocaleString('ko-KR')}</p>
+    ${pane.querySelector('table').outerHTML}
+  `;
+  html2pdf().set({
+    margin:10,
+    filename:`대박마트_${title}_${new Date().toISOString().slice(0,10)}.pdf`,
+    html2canvas:{scale:2},
+    jsPDF:{orientation:'portrait',unit:'mm',format:'a4'}
+  }).from(el).save();
+}
+
+// ===== 초기화 =====
+if (scriptUrl) {
+  document.getElementById('scriptUrl').value = scriptUrl;
+  setSyncStatus('', '구글시트 연동됨');
+}
+renderInv();
+updateSelect();
+</script>
+</body>
+</html>
