@@ -143,7 +143,6 @@
       min-width: 40px;
     }
     .editable:hover { background: #EBF3FF; }
-    .edit-hint { font-size: 10px; color: #aaa; margin-left: 4px; }
     .inline-input {
       width: 100%;
       min-width: 60px;
@@ -561,12 +560,12 @@ function renderInv() {
   }
   tb.innerHTML = list.map(p => `
     <tr id="row-${p.id}">
-      <td><span class="editable" onclick="startEdit(${p.id},'name',this)">${p.name}<span class="edit-hint">✏️</span></span></td>
-      <td><span class="editable ${p.current < p.required ? 'tag-low' : 'tag-ok'}" onclick="startEdit(${p.id},'current',this)">${p.current}<span class="edit-hint">✏️</span></span></td>
-      <td><span class="editable" onclick="startEdit(${p.id},'required',this)">${p.required}<span class="edit-hint">✏️</span></span></td>
-      <td><span class="editable" onclick="startEdit(${p.id},'price',this)">$${Number(p.price).toFixed(2)}<span class="edit-hint">✏️</span></span></td>
-      <td><span class="editable" onclick="startEdit(${p.id},'expire',this)">${p.expire||'-'}<span class="edit-hint">✏️</span></span></td>
-      <td><span class="editable" onclick="startEdit(${p.id},'notes',this)">${p.notes||'-'}<span class="edit-hint">✏️</span></span></td>
+      <td><span class="editable" onclick="startEdit(${p.id},'name',this)">${p.name}</span></td>
+      <td><span class="editable ${p.current < p.required ? 'tag-low' : 'tag-ok'}" onclick="startEdit(${p.id},'current',this)">${p.current}</span></td>
+      <td><span class="editable" onclick="startEdit(${p.id},'required',this)">${p.required}</span></td>
+      <td><span class="editable" onclick="startEdit(${p.id},'price',this)">$${Number(p.price).toFixed(2)}</span></td>
+      <td><span class="editable" onclick="startEdit(${p.id},'expire',this)">${p.expire||'-'}</span></td>
+      <td><span class="editable" onclick="startEdit(${p.id},'notes',this)">${p.notes||'-'}</span></td>
       <td><button class="btn-del" onclick="delProduct(${p.id})">삭제</button></td>
     </tr>`).join('');
 }
